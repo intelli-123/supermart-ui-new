@@ -161,18 +161,16 @@ jobs:
             vpcaccess.googleapis.com
 
       # Create the GCS state bucket if it doesn't exist (idempotent — ignores 409)
+      # Note: versioning is intentionally NOT enabled — GCS versioning creates
+      # tombstone objects on delete that break Terraform's If-None-Match locking.
       - name: Ensure GCS Terraform state bucket exists
         run: |
           BUCKET="tfstate-test-supermart-dev"
-          if gcloud storage buckets create "gs://${BUCKET}" \
-              --project="${{ env.GCP_PROJECT_ID }}" \
-              --location=US \
-              --uniform-bucket-level-access 2>&1 | grep -v "already own it"; then
-            gcloud storage buckets update "gs://${BUCKET}" --versioning
-            echo "Bucket ${BUCKET} created."
-          else
-            echo "Bucket ${BUCKET} already exists — skipping create."
-          fi
+          gcloud storage buckets create "gs://${BUCKET}" \
+            --project="${{ env.GCP_PROJECT_ID }}" \
+            --location=US \
+            --uniform-bucket-level-access 2>&1 | true
+          echo "Bucket ${BUCKET} ready."
 
       - name: Terraform Init
         working-directory: ${{ env.WORKING_DIR }}
@@ -200,10 +198,10 @@ jobs:
             module.compute.google_cloud_run_v2_service_iam_member.test_supermart_public_invoker \
             2>/dev/null || true
 
-      # Force-remove any stale GCS state lock left by a prior failed run
+      # Remove all versions of the state lock (including GCS tombstones from prior runs)
       - name: Clear stale Terraform state lock (if any)
         run: |
-          gcloud storage rm \
+          gcloud storage rm --all-versions \
             gs://tfstate-test-supermart-dev/terraform/state/default.tflock \
             2>/dev/null || true
 
@@ -222,6 +220,13 @@ jobs:
           name: tfplan-dev
           path: ${{ env.WORKING_DIR }}/tfplan
           retention-days: 3
+
+      # Plan releases the lock on completion — clear its tombstone before Apply
+      - name: Clear Terraform state lock before Apply
+        run: |
+          gcloud storage rm --all-versions \
+            gs://tfstate-test-supermart-dev/terraform/state/default.tflock \
+            2>/dev/null || true
 
       - name: Terraform Apply
         working-directory: ${{ env.WORKING_DIR }}
