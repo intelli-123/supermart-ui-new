@@ -13,13 +13,8 @@ variable "image" {
   type        = string
 }
 
-variable "vpc_connector_id" {
-  description = "ID of the Serverless VPC Access Connector"
-  type        = string
-}
-
-variable "db_private_ip" {
-  description = "Private IP address of the Cloud SQL instance"
+variable "db_public_ip" {
+  description = "Public IP address of the Cloud SQL instance"
   type        = string
 }
 

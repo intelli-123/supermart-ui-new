@@ -12,14 +12,17 @@ resource "google_sql_database_instance" "test_supermart_db" {
     disk_size         = 10
 
     ip_configuration {
-      ipv4_enabled                                  = false
-      private_network                               = var.vpc_self_link
-      enable_private_path_for_google_cloud_services = true
+      # Public IP — Cloud Run connects directly over SSL (dev environment)
+      ipv4_enabled = true
+
+      authorized_networks {
+        name  = "allow-all-dev"
+        value = "0.0.0.0/0"
+      }
     }
 
     backup_configuration {
-      enabled            = true
-      binary_log_enabled = true
+      enabled = true
     }
 
     database_flags {

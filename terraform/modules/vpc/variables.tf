@@ -13,9 +13,3 @@ variable "subnet_cidr" {
   type        = string
   default     = "10.0.0.0/24"
 }
-
-variable "connector_cidr" {
-  description = "CIDR range for the VPC Access Connector (/28 required)"
-  type        = string
-  default     = "10.8.0.0/28"
-}

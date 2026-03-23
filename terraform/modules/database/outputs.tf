@@ -3,9 +3,9 @@ output "connection_name" {
   value       = google_sql_database_instance.test_supermart_db.connection_name
 }
 
-output "private_ip" {
-  description = "Private IP address of the Cloud SQL instance"
-  value       = google_sql_database_instance.test_supermart_db.private_ip_address
+output "public_ip" {
+  description = "Public IP address of the Cloud SQL instance"
+  value       = google_sql_database_instance.test_supermart_db.public_ip_address
 }
 
 output "db_name" {

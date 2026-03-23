@@ -12,3 +12,8 @@ output "cloud_sql_connection_name" {
   description = "Cloud SQL connection name for reference"
   value       = module.database.connection_name
 }
+
+output "cloud_sql_public_ip" {
+  description = "Cloud SQL public IP"
+  value       = module.database.public_ip
+}

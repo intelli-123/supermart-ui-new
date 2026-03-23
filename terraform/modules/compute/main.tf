@@ -31,12 +31,6 @@ resource "google_cloud_run_v2_service" "test_supermart_app" {
   template {
     service_account = google_service_account.test_supermart_run_sa.email
 
-    # Route all egress through VPC to reach Cloud SQL private IP
-    vpc_access {
-      connector = var.vpc_connector_id
-      egress    = "ALL_TRAFFIC"
-    }
-
     scaling {
       min_instance_count = 0
       max_instance_count = 3
@@ -64,7 +58,7 @@ resource "google_cloud_run_v2_service" "test_supermart_app" {
 
       env {
         name  = "SPRING_DATASOURCE_URL"
-        value = "jdbc:mysql://${var.db_private_ip}:3306/${var.db_name}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+        value = "jdbc:mysql://${var.db_public_ip}:3306/${var.db_name}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
       }
 
       env {
