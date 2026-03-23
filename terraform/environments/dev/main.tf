@@ -4,9 +4,9 @@ provider "google" {
 }
 
 module "vpc" {
-  source     = "../../modules/vpc"
-  project_id = var.project_id
-  region     = var.region
+  source      = "../../modules/vpc"
+  project_id  = var.project_id
+  region      = var.region
   subnet_cidr = "10.0.0.0/24"
 }
 
