@@ -205,6 +205,19 @@ jobs:
             gs://tfstate-test-supermart-dev/terraform/state/default.tflock \
             2>/dev/null || true
 
+      # Reconcile Terraform state with actual GCP resources after partial runs:
+      #   - Remove stale VPC connector (removed from config) from state
+      #   - Import Cloud SQL instance if it already exists in GCP
+      - name: Reconcile Terraform state
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          terraform state rm module.vpc.google_vpc_access_connector.test_supermart_conn \
+            2>/dev/null || true
+          terraform import \
+            module.database.google_sql_database_instance.test_supermart_db \
+            proven-country-485607-p6:us-central1:test-supermart-db-dev \
+            2>/dev/null || true
+
       - name: Terraform Plan
         id: plan
         working-directory: ${{ env.WORKING_DIR }}
