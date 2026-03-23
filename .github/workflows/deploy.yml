@@ -160,20 +160,18 @@ jobs:
             sqladmin.googleapis.com \
             vpcaccess.googleapis.com
 
-      # Create the GCS state bucket if it doesn't exist
+      # Create the GCS state bucket if it doesn't exist (idempotent — ignores 409)
       - name: Ensure GCS Terraform state bucket exists
         run: |
           BUCKET="tfstate-test-supermart-dev"
-          if ! gcloud storage buckets describe "gs://${BUCKET}" \
-              --project="${{ env.GCP_PROJECT_ID }}" &>/dev/null; then
-            gcloud storage buckets create "gs://${BUCKET}" \
+          if gcloud storage buckets create "gs://${BUCKET}" \
               --project="${{ env.GCP_PROJECT_ID }}" \
               --location=US \
-              --uniform-bucket-level-access
+              --uniform-bucket-level-access 2>&1 | grep -v "already own it"; then
             gcloud storage buckets update "gs://${BUCKET}" --versioning
             echo "Bucket ${BUCKET} created."
           else
-            echo "Bucket ${BUCKET} already exists."
+            echo "Bucket ${BUCKET} already exists — skipping create."
           fi
 
       - name: Terraform Init
