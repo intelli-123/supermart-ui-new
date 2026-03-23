@@ -200,6 +200,13 @@ jobs:
             module.compute.google_cloud_run_v2_service_iam_member.test_supermart_public_invoker \
             2>/dev/null || true
 
+      # Force-remove any stale GCS state lock left by a prior failed run
+      - name: Clear stale Terraform state lock (if any)
+        run: |
+          gcloud storage rm \
+            gs://tfstate-test-supermart-dev/terraform/state/default.tflock \
+            2>/dev/null || true
+
       - name: Terraform Plan
         id: plan
         working-directory: ${{ env.WORKING_DIR }}
