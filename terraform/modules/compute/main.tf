@@ -24,10 +24,9 @@ resource "google_project_iam_member" "test_supermart_run_sa_metrics" {
 }
 
 resource "google_cloud_run_v2_service" "test_supermart_app" {
-  name                = "test-svc-supermart-dev"
-  location            = var.region
-  project             = var.project_id
-  deletion_protection = false
+  name     = "test-svc-supermart-dev"
+  location = var.region
+  project  = var.project_id
 
   template {
     service_account = google_service_account.test_supermart_run_sa.email
