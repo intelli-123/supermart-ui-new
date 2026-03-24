@@ -244,6 +244,13 @@ jobs:
               "projects/${{ env.GCP_PROJECT_ID }}/instances/test-supermart-db-dev" || true
           fi
 
+      # Reconcile steps (state rm / import) leave lock tombstones — clear before Plan
+      - name: Clear Terraform state lock before Plan
+        run: |
+          gcloud storage rm --all-versions \
+            gs://tfstate-test-supermart-dev/terraform/state/default.tflock \
+            2>/dev/null || true
+
       - name: Terraform Plan
         id: plan
         working-directory: ${{ env.WORKING_DIR }}
