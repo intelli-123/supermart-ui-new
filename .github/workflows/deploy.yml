@@ -234,7 +234,7 @@ jobs:
           # terraform state show exits 0 if the resource is tracked, non-zero if not.
           if gcloud sql instances describe test-supermart-db-dev \
               --project="${{ env.GCP_PROJECT_ID }}" >/dev/null 2>&1; then
-            if ! terraform state show \
+            if ! terraform state show -lock=false \
                 module.database.google_sql_database_instance.test_supermart_db \
                 >/dev/null 2>&1; then
               echo "Cloud SQL instance exists in GCP but not in state — importing..."
@@ -250,7 +250,7 @@ jobs:
         id: plan
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          terraform plan -input=false -out=tfplan \
+          terraform plan -input=false -lock=false -out=tfplan \
             -var="image=${{ env.TF_VAR_image }}" \
             -var="ui_image=${{ env.TF_VAR_ui_image }}" \
             -var="db_password=${{ env.TF_VAR_db_password }}" \
@@ -265,7 +265,7 @@ jobs:
 
       - name: Terraform Apply
         working-directory: ${{ env.WORKING_DIR }}
-        run: terraform apply -input=false tfplan
+        run: terraform apply -input=false -lock=false tfplan
 
       - name: Show deployment URLs
         working-directory: ${{ env.WORKING_DIR }}
