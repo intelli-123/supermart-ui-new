@@ -221,30 +221,13 @@ jobs:
             module.compute.google_cloud_run_v2_service_iam_member.test_supermart_ui_public_invoker \
             2>/dev/null || true
 
-      # Reconcile Terraform state with actual GCP resources after partial runs.
-      # -lock=false on all state ops to avoid creating GCS lock tombstones before Plan.
+      # Remove stale VPC connector from state if it was left over from a prior config.
+      # Cloud SQL is never deleted from GCP or state so no import logic is needed.
       - name: Reconcile Terraform state
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          # Remove stale VPC connector (removed from config) from state if present
           terraform state rm -lock=false \
             module.vpc.google_vpc_access_connector.test_supermart_conn 2>/dev/null || true
-
-          # Import Cloud SQL instance only if it exists in GCP AND is absent from state.
-          # terraform state show exits 0 if the resource is tracked, non-zero if not.
-          if gcloud sql instances describe test-supermart-db-dev \
-              --project="${{ env.GCP_PROJECT_ID }}" >/dev/null 2>&1; then
-            if ! terraform state show -lock=false \
-                module.database.google_sql_database_instance.test_supermart_db \
-                >/dev/null 2>&1; then
-              echo "Cloud SQL instance exists in GCP but not in state — importing..."
-              terraform import -lock=false \
-                module.database.google_sql_database_instance.test_supermart_db \
-                "projects/${{ env.GCP_PROJECT_ID }}/instances/test-supermart-db-dev"
-            else
-              echo "Cloud SQL instance already tracked in state — skipping import."
-            fi
-          fi
 
       - name: Terraform Plan
         id: plan
