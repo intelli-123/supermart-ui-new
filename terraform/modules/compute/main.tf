@@ -73,7 +73,7 @@ resource "google_cloud_run_v2_service" "test_supermart_app" {
 
       env {
         name  = "SPRING_JPA_HIBERNATE_DDL_AUTO"
-        value = "none"
+        value = "update"
       }
 
       env {
