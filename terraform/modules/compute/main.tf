@@ -76,6 +76,14 @@ resource "google_cloud_run_v2_service" "test_supermart_app" {
         value = "update"
       }
 
+      # Run data.sql after Hibernate creates/updates the schema.
+      # spring.jpa.defer-datasource-initialization=true (in application.properties)
+      # ensures Hibernate runs first, then Spring's SQL initializer seeds the data.
+      env {
+        name  = "SPRING_SQL_INIT_MODE"
+        value = "always"
+      }
+
       env {
         name  = "APP_JWT_SECRET"
         value = var.jwt_secret
