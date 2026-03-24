@@ -197,7 +197,8 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         run: terraform validate
 
-      # Remove stuck Cloud Run services if a prior failed run left deletion_protection issues
+      # Remove stuck Cloud Run services if a prior failed run left deletion_protection issues.
+      # -lock=false is used on state rm so these cleanup ops don't acquire/leave a GCS lock tombstone.
       - name: Clean up stuck Cloud Run services (if any)
         working-directory: ${{ env.WORKING_DIR }}
         run: |
@@ -209,53 +210,40 @@ jobs:
             --region=${{ env.REGION }} \
             --project=${{ env.GCP_PROJECT_ID }} \
             --quiet 2>/dev/null || true
-          terraform state rm module.compute.google_cloud_run_v2_service.test_supermart_app \
-            2>/dev/null || true
-          terraform state rm \
+          terraform state rm -lock=false \
+            module.compute.google_cloud_run_v2_service.test_supermart_app 2>/dev/null || true
+          terraform state rm -lock=false \
             module.compute.google_cloud_run_v2_service_iam_member.test_supermart_public_invoker \
             2>/dev/null || true
-          terraform state rm module.compute.google_cloud_run_v2_service.test_supermart_ui \
-            2>/dev/null || true
-          terraform state rm \
+          terraform state rm -lock=false \
+            module.compute.google_cloud_run_v2_service.test_supermart_ui 2>/dev/null || true
+          terraform state rm -lock=false \
             module.compute.google_cloud_run_v2_service_iam_member.test_supermart_ui_public_invoker \
             2>/dev/null || true
 
-      # Remove all versions of the state lock (including GCS tombstones from prior runs)
-      - name: Clear stale Terraform state lock (if any)
-        run: |
-          gcloud storage rm --all-versions \
-            gs://tfstate-test-supermart-dev/terraform/state/default.tflock \
-            2>/dev/null || true
-
-      # Reconcile Terraform state with actual GCP resources after partial runs
+      # Reconcile Terraform state with actual GCP resources after partial runs.
+      # -lock=false on all state ops to avoid creating GCS lock tombstones before Plan.
       - name: Reconcile Terraform state
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           # Remove stale VPC connector (removed from config) from state if present
-          terraform state rm module.vpc.google_vpc_access_connector.test_supermart_conn \
-            2>/dev/null || true
+          terraform state rm -lock=false \
+            module.vpc.google_vpc_access_connector.test_supermart_conn 2>/dev/null || true
 
           # Import Cloud SQL instance only if it exists in GCP AND is absent from state
           IN_GCP=false
           IN_STATE=false
           gcloud sql instances describe test-supermart-db-dev \
-            --project="${{ env.GCP_PROJECT_ID }}" >/dev/null 2>&1 && IN_GCP=true
-          terraform state list 2>/dev/null | \
-            grep -q "module.database.google_sql_database_instance.test_supermart_db" \
+            --project="${{ env.GCP_PROJECT_ID }}" >/dev/null 2>&1 && IN_GCP=true || true
+          terraform state list -lock=false 2>/dev/null | \
+            grep -qF "module.database.google_sql_database_instance.test_supermart_db" \
             && IN_STATE=true || true
           if [ "$IN_GCP" = "true" ] && [ "$IN_STATE" = "false" ]; then
             echo "Cloud SQL instance exists in GCP but not in state — importing..."
-            terraform import \
+            terraform import -lock=false \
               module.database.google_sql_database_instance.test_supermart_db \
               "projects/${{ env.GCP_PROJECT_ID }}/instances/test-supermart-db-dev"
           fi
-
-      # Reconcile steps (state rm / import) leave lock tombstones — clear before Plan
-      - name: Clear Terraform state lock before Plan
-        run: |
-          gcloud storage rm --all-versions \
-            gs://tfstate-test-supermart-dev/terraform/state/default.tflock \
-            2>/dev/null || true
 
       - name: Terraform Plan
         id: plan
@@ -273,13 +261,6 @@ jobs:
           name: tfplan-dev
           path: ${{ env.WORKING_DIR }}/tfplan
           retention-days: 3
-
-      # Plan releases the lock on completion — clear its tombstone before Apply
-      - name: Clear Terraform state lock before Apply
-        run: |
-          gcloud storage rm --all-versions \
-            gs://tfstate-test-supermart-dev/terraform/state/default.tflock \
-            2>/dev/null || true
 
       - name: Terraform Apply
         working-directory: ${{ env.WORKING_DIR }}
