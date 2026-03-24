@@ -22,6 +22,7 @@ module "compute" {
   project_id   = var.project_id
   region       = var.region
   image        = var.image
+  ui_image     = var.ui_image
   db_public_ip = module.database.public_ip
   db_name      = module.database.db_name
   db_user      = module.database.db_user

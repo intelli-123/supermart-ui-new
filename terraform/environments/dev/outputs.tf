@@ -17,3 +17,8 @@ output "cloud_sql_public_ip" {
   description = "Cloud SQL public IP"
   value       = module.database.public_ip
 }
+
+output "ui_url" {
+  description = "Angular UI URL"
+  value       = module.compute.ui_url
+}

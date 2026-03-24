@@ -19,7 +19,8 @@ env:
   WIF_POOL_ID: github-wif-pool
   WIF_PROVIDER_ID: github
   GCP_SA_EMAIL: github-wif-sa@proven-country-485607-p6.iam.gserviceaccount.com
-  IMAGE_NAME: ${{ vars.IMAGE_NAME || 'test-supermart-ui' }}
+  IMAGE_NAME: ${{ vars.IMAGE_NAME || 'test-supermart-api' }}
+  UI_IMAGE_NAME: ${{ vars.UI_IMAGE_NAME || 'test-supermart-ui' }}
   GCR_HOST: ${{ vars.GCR_HOST || 'gcr.io' }}
   REGION: us-central1
 
@@ -33,6 +34,7 @@ jobs:
     environment: dev
     outputs:
       image_ref: ${{ steps.image.outputs.image_ref }}
+      ui_image_ref: ${{ steps.image.outputs.ui_image_ref }}
 
     steps:
       - name: Checkout
@@ -91,21 +93,31 @@ jobs:
       - name: Configure Docker auth for gcr.io
         run: gcloud auth configure-docker ${{ env.GCR_HOST }} --quiet
 
-      - name: Compute image tag
+      - name: Compute image tags
         id: image
         run: |
           TAG=$(echo "$GITHUB_SHA" | cut -c1-7)
           IMAGE_REF="${{ env.GCR_HOST }}/${{ env.GCP_PROJECT_ID }}/${{ env.IMAGE_NAME }}:${TAG}"
+          UI_IMAGE_REF="${{ env.GCR_HOST }}/${{ env.GCP_PROJECT_ID }}/${{ env.UI_IMAGE_NAME }}:${TAG}"
           echo "TAG=${TAG}" >> $GITHUB_ENV
           echo "image_ref=${IMAGE_REF}" >> $GITHUB_OUTPUT
+          echo "ui_image_ref=${UI_IMAGE_REF}" >> $GITHUB_OUTPUT
 
-      - name: Docker build & push
+      - name: Docker build & push (API)
         run: |
           set -euo pipefail
           echo "Building ${{ steps.image.outputs.image_ref }} from ./supermart-iot ..."
           docker build -t "${{ steps.image.outputs.image_ref }}" --no-cache ./supermart-iot
           echo "Pushing ${{ steps.image.outputs.image_ref }} ..."
           docker push "${{ steps.image.outputs.image_ref }}"
+
+      - name: Docker build & push (UI)
+        run: |
+          set -euo pipefail
+          echo "Building ${{ steps.image.outputs.ui_image_ref }} from ./supermart-ui ..."
+          docker build -t "${{ steps.image.outputs.ui_image_ref }}" --no-cache ./supermart-ui
+          echo "Pushing ${{ steps.image.outputs.ui_image_ref }} ..."
+          docker push "${{ steps.image.outputs.ui_image_ref }}"
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Job 2: Terraform — deploy to dev
@@ -118,6 +130,7 @@ jobs:
 
     env:
       TF_VAR_image: ${{ needs.build-and-push.outputs.image_ref }}
+      TF_VAR_ui_image: ${{ needs.build-and-push.outputs.ui_image_ref }}
       TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
       TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
       WORKING_DIR: ./terraform/environments/dev
@@ -184,11 +197,15 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         run: terraform validate
 
-      # Remove stuck Cloud Run service if a prior failed run left deletion_protection issues
-      - name: Clean up stuck Cloud Run service (if any)
+      # Remove stuck Cloud Run services if a prior failed run left deletion_protection issues
+      - name: Clean up stuck Cloud Run services (if any)
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           gcloud run services delete test-svc-supermart-dev \
+            --region=${{ env.REGION }} \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            --quiet 2>/dev/null || true
+          gcloud run services delete ui-svc-supermart-dev \
             --region=${{ env.REGION }} \
             --project=${{ env.GCP_PROJECT_ID }} \
             --quiet 2>/dev/null || true
@@ -196,6 +213,11 @@ jobs:
             2>/dev/null || true
           terraform state rm \
             module.compute.google_cloud_run_v2_service_iam_member.test_supermart_public_invoker \
+            2>/dev/null || true
+          terraform state rm module.compute.google_cloud_run_v2_service.test_supermart_ui \
+            2>/dev/null || true
+          terraform state rm \
+            module.compute.google_cloud_run_v2_service_iam_member.test_supermart_ui_public_invoker \
             2>/dev/null || true
 
       # Remove all versions of the state lock (including GCS tombstones from prior runs)
@@ -228,6 +250,7 @@ jobs:
         run: |
           terraform plan -input=false -out=tfplan \
             -var="image=${{ env.TF_VAR_image }}" \
+            -var="ui_image=${{ env.TF_VAR_ui_image }}" \
             -var="db_password=${{ env.TF_VAR_db_password }}" \
             -var="jwt_secret=${{ env.TF_VAR_jwt_secret }}"
 
@@ -253,7 +276,8 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           echo "=== Deployment Complete ==="
-          echo "Cloud Run URL: $(terraform output -raw cloud_run_url)"
+          echo "UI (Frontend): $(terraform output -raw ui_url)"
+          echo "API (Backend): $(terraform output -raw cloud_run_url)"
           echo "Swagger UI:    $(terraform output -raw swagger_ui_url)"
 
       - name: Post failure summary to PR

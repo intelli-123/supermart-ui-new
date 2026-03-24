@@ -39,3 +39,8 @@ variable "jwt_secret" {
   type        = string
   sensitive   = true
 }
+
+variable "ui_image" {
+  description = "Full Docker image reference for the Angular UI (e.g. gcr.io/project/ui:tag)"
+  type        = string
+}

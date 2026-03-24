@@ -12,3 +12,8 @@ output "service_account_email" {
   description = "Email of the Cloud Run service account"
   value       = google_service_account.test_supermart_run_sa.email
 }
+
+output "ui_url" {
+  description = "Base URL of the Angular UI Cloud Run service"
+  value       = google_cloud_run_v2_service.test_supermart_ui.uri
+}

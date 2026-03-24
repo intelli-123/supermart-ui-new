@@ -15,6 +15,11 @@ variable "image" {
   type        = string
 }
 
+variable "ui_image" {
+  description = "Full Docker image reference for the Angular UI (gcr.io/project/image:tag)"
+  type        = string
+}
+
 variable "db_password" {
   description = "Cloud SQL MySQL application user password"
   type        = string

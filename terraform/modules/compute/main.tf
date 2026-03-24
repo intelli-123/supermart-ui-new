@@ -127,3 +127,74 @@ resource "google_cloud_run_v2_service_iam_member" "test_supermart_public_invoker
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+# ─── Frontend: Angular UI ────────────────────────────────────────────────────
+resource "google_cloud_run_v2_service" "test_supermart_ui" {
+  name     = "ui-svc-supermart-dev"
+  location = var.region
+  project  = var.project_id
+
+  template {
+    service_account = google_service_account.test_supermart_run_sa.email
+
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 3
+    }
+
+    containers {
+      image = var.ui_image
+
+      ports {
+        container_port = 8080
+      }
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "256Mi"
+        }
+        cpu_idle = true
+      }
+
+      # nginx.conf.template uses $API_URL to reverse-proxy /api/* to the backend.
+      # Using the backend service URI keeps frontend and backend on the same origin
+      # from the browser's perspective — no CORS config needed.
+      env {
+        name  = "API_URL"
+        value = google_cloud_run_v2_service.test_supermart_app.uri
+      }
+
+      startup_probe {
+        http_get {
+          path = "/healthz"
+          port = 8080
+        }
+        initial_delay_seconds = 10
+        period_seconds        = 10
+        failure_threshold     = 3
+        timeout_seconds       = 5
+      }
+
+      liveness_probe {
+        http_get {
+          path = "/healthz"
+          port = 8080
+        }
+        period_seconds    = 30
+        failure_threshold = 3
+        timeout_seconds   = 5
+      }
+    }
+  }
+
+  depends_on = [google_cloud_run_v2_service.test_supermart_app]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "test_supermart_ui_public_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.test_supermart_ui.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
