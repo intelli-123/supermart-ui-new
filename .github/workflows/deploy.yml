@@ -234,7 +234,7 @@ jobs:
           # terraform state show exits 0 if the resource is tracked, non-zero if not.
           if gcloud sql instances describe test-supermart-db-dev \
               --project="${{ env.GCP_PROJECT_ID }}" >/dev/null 2>&1; then
-            if ! terraform state show -lock=false \
+            if ! terraform state show \
                 module.database.google_sql_database_instance.test_supermart_db \
                 >/dev/null 2>&1; then
               echo "Cloud SQL instance exists in GCP but not in state — importing..."
